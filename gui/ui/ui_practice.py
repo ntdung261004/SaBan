@@ -89,7 +89,7 @@ class MainGui(QWidget):
         self.refresh_button = QPushButton("Làm mới")
         self.zoom_slider = QSlider(Qt.Horizontal); self.zoom_slider.setRange(10, 50); self.zoom_slider.setValue(10)
         self.zoom_value_label = QLabel("1.0x"); self.zoom_value_label.setObjectName("zoomValueLabel")
-        self.calibrate_button = QPushButton("Hiệu chỉnh tâm")
+        self.calibrate_button = QPushButton("HIỆU CHỈNH TÂM")
         controls_layout.addWidget(self.refresh_button)
         controls_layout.addWidget(QLabel("Khoảng cách:")); controls_layout.addWidget(self.zoom_slider, 1); controls_layout.addWidget(self.zoom_value_label)
         controls_layout.addSpacing(15); controls_layout.addWidget(self.calibrate_button)

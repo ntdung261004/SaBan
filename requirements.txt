@@ -1,0 +1,16 @@
+# Các thư viện giao diện và media
+PySide6
+pygame
+
+# Thư viện xử lý hình ảnh
+numpy==1.26.4
+opencv-python==4.7.0.68
+
+# Các thư viện tiện ích
+pynput
+getmac
+platformdirs
+Cython
+
+# Thư viện để đóng gói ứng dụng
+pyinstaller

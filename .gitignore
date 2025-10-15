@@ -1,0 +1,17 @@
+# Môi trường ảo
+venv/
+.venv/
+
+.DS_Store
+# Python cache
+__pycache__/
+*.pyc
+
+# Thư mục build của PyInstaller
+build/
+dist/
+*.spec
+
+# File của các IDE
+.vscode/
+.idea/

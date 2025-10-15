@@ -1,5 +1,5 @@
 # file: app_lite.py
-# NỘI DUNG ĐÃ LOẠI BỎ ÂM THANH BẮN
+# NỘI DUNG ĐÃ CẬP NHẬT ICON VÀ GIAO DIỆN TỐI ƯU
 
 import sys
 import logging
@@ -12,7 +12,8 @@ from platformdirs import user_data_dir
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QInputDialog
 from PySide6.QtCore import QTimer, Signal, Slot, QPoint, Qt, QThread
-from PySide6.QtGui import QScreen
+# <<< THAY ĐỔI 1: Import QIcon
+from PySide6.QtGui import QScreen, QIcon 
 
 from gui.ui.ui_practice import MainGui
 from utils.audio import AudioManager
@@ -20,6 +21,7 @@ from utils.camera import count_available_cameras, Camera
 from core.triggers import BluetoothTrigger
 from core.worker import ProcessingWorker
 from utils.license_manager import verify_key
+from utils.resource_path import resource_path # Đảm bảo đã import để dùng cho icon
 
 # --- CẤU HÌNH THƯ MỤC LƯU DỮ LIỆU VÀ LOGGING ---
 APP_DATA_DIR = user_data_dir("ShootingAppLite", "LuanTung")
@@ -68,6 +70,10 @@ class PracticeLiteWindow(QMainWindow):
     def __init__(self, config: dict, worker: ProcessingWorker, trigger: BluetoothTrigger):
         super().__init__()
         self.setWindowTitle("Phần Mềm Bắn Pháo Sa Bàn")
+        
+        # <<< THAY ĐỔI 2: Đặt icon cho cửa sổ chính
+        self.setWindowIcon(QIcon(resource_path("assets/app_icon.ico")))
+        
         self.config = config
         self.audio_manager = AudioManager()
         self.trigger = trigger
@@ -188,9 +194,7 @@ class PracticeLiteWindow(QMainWindow):
         if not self.is_camera_connected: return
         ret, frame = self.cam.read()
         if ret and frame is not None:
-            # <<< THAY ĐỔI: Đã vô hiệu hóa âm thanh bắn
             # self.audio_manager.play_sound('shot')
-            
             frame_cropped = self._crop_frame_to_square(frame)
             frame_resized = cv2.resize(frame_cropped, self.final_size)
             result_frame = self.get_display_frame(frame_resized)

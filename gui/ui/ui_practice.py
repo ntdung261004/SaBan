@@ -1,5 +1,5 @@
 # file: gui/ui/ui_practice.py
-# NỘI DUNG ĐÃ CẬP NHẬT BỐ CỤC CỘT PHẢI
+# NỘI DUNG ĐÃ TRẢ LẠI TRẠNG THÁI GIAO DIỆN GỐC CHO TIÊU ĐỀ
 
 import cv2
 from PySide6.QtWidgets import (
@@ -8,6 +8,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont, QImage, QPixmap, QPainter, QColor
 from PySide6.QtCore import Qt, QPoint, Signal
+
+from utils.resource_path import resource_path
 
 class VideoLabel(QLabel):
     clicked = Signal(QPoint)
@@ -48,6 +50,7 @@ class MainGui(QWidget):
         self.setStyleSheet("""
             QWidget { background-color: #2c3e50; color: #ecf0f1; font-family: 'Segoe UI'; }
             QFrame#panel { background-color: #34495e; border-radius: 12px; border: 1px solid #4a6278; }
+            /* <<< THAY ĐỔI: Trả lại style gốc cho tiêu đề, không có màu nền */
             QLabel#title { color: #ecf0f1; padding: 10px; }
             QLabel.panel-title { font-size: 16px; font-weight: bold; color: #ecf0f1; padding: 8px 15px; background-color: #415a72; border-radius: 6px; }
             QPushButton { background-color: #1abc9c; color: white; font-size: 14px; font-weight: bold; border: none; padding: 10px 20px; border-radius: 8px; }
@@ -104,23 +107,23 @@ class MainGui(QWidget):
         # --- Phần trên: Logo và Tên (Tỷ lệ 4) ---
         top_container = QWidget()
         top_layout = QVBoxLayout(top_container)
-        # <<< THAY ĐỔI: Bỏ setAlignment, chúng ta sẽ dùng addStretch để đảm bảo căn giữa
-        # top_layout.setAlignment(Qt.AlignCenter) 
         top_layout.setSpacing(15)
-        top_layout.setContentsMargins(0, 15, 0, 15) # Xóa lề mặc định
+        top_layout.setContentsMargins(0, 15, 0, 15)
 
         # --- Bọc logo trong một QHBoxLayout với "lò xo đẩy" ---
         logo_h_layout = QHBoxLayout()
         logo_label = QLabel()
-        pixmap = QPixmap("assets/images/logo.png")
+        
+        pixmap = QPixmap(resource_path("assets/images/logo.png"))
+        
         logo_label.setPixmap(pixmap)
         logo_label.setScaledContents(True)
         logo_label.setMaximumSize(150, 150)
         logo_label.setAlignment(Qt.AlignCenter)
         
-        logo_h_layout.addStretch()      # Lò xo bên trái
-        logo_h_layout.addWidget(logo_label) # Logo ở giữa
-        logo_h_layout.addStretch()      # Lò xo bên phải
+        logo_h_layout.addStretch()
+        logo_h_layout.addWidget(logo_label)
+        logo_h_layout.addStretch()
         
         # Họ và tên
         name_label = QLabel("Tác giả: Nguyễn Trung Trực")
@@ -146,11 +149,12 @@ class MainGui(QWidget):
         self.close_button.setObjectName("danger")
         
         # --- Thêm các phần vào layout chính với tỷ lệ ---
-        layout.addWidget(top_container, 4)  # Tỷ lệ 4
-        layout.addWidget(result_box, 6)     # Tỷ lệ 6
+        layout.addWidget(top_container, 4)
+        layout.addWidget(result_box, 6)
         layout.addWidget(self.close_button)
         
         return panel
+
     def _convert_cv_to_pixmap(self, cv_img) -> QPixmap:
         if cv_img is None: return QPixmap()
         rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB); h, w, ch = rgb_image.shape; bytes_per_line = ch * w

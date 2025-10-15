@@ -1,4 +1,6 @@
 # file: utils/camera.py
+# NỘI DUNG ĐÃ TỐI ƯU ĐỂ PHÁT HIỆN MẤT KẾT NỐI TRÊN WINDOWS
+
 import cv2
 import logging
 import sys
@@ -53,6 +55,15 @@ class Camera:
     def read(self):
         if not self.isOpened():
             return (False, None)
+            
+        # <<< THAY ĐỔI: Thêm "Heartbeat Check" để phát hiện mất kết nối trên Windows
+        # Thử lấy một thuộc tính của camera. Nếu nó trả về 0, camera có thể đã bị ngắt.
+        # Đây là cách hiệu quả để kiểm tra thay vì chỉ dựa vào ret của cap.read()
+        if self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) == 0:
+            logger.warning(f"CAMERA: Heartbeat check thất bại cho camera index {self.index}. Thiết bị có thể đã bị ngắt kết nối.")
+            return (False, None)
+        # --- Kết thúc thay đổi ---
+
         ret, frame = self.cap.read()
         return (ret, frame)
     

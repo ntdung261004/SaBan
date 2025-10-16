@@ -1,10 +1,9 @@
 # file: utils/camera.py
-# NỘI DUNG ĐÃ TỐI ƯU ĐỂ PHÁT HIỆN MẤT KẾT NỐI TRÊN WINDOWS
+# PHIÊN BẢN CUỐI CÙNG
 
 import cv2
 import logging
 import sys
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +16,16 @@ def _get_os_backend():
     return cv2.CAP_ANY
 
 def count_available_cameras(max_to_check=5) -> int:
-    """
-    Quét và đếm số lượng camera đang hoạt động có thể kết nối.
-    Hàm này rất quan trọng để xác định có USB camera hay không.
-    """
-    logger.info("CAMERA: Bắt đầu đếm số lượng camera có sẵn...")
+    """Quét và đếm số lượng camera đang hoạt động có thể kết nối."""
     count = 0
     api_preference = _get_os_backend()
     for i in range(max_to_check):
         cap = cv2.VideoCapture(i, api_preference)
         if cap is not None and cap.isOpened():
-            # Đảm bảo camera thực sự hoạt động bằng cách đọc thử 1 frame
             is_working, _ = cap.read()
             if is_working:
                 count += 1
             cap.release()
-    logger.info(f"CAMERA: Tìm thấy tổng cộng {count} camera hoạt động.")
     return count
 
 class Camera:
@@ -53,19 +46,17 @@ class Camera:
         return self.cap is not None and self.cap.isOpened()
 
     def read(self):
+        """Sử dụng grab() và retrieve() để đọc frame một cách an toàn."""
         if not self.isOpened():
             return (False, None)
-            
-        # <<< THAY ĐỔI: Thêm "Heartbeat Check" để phát hiện mất kết nối trên Windows
-        # Thử lấy một thuộc tính của camera. Nếu nó trả về 0, camera có thể đã bị ngắt.
-        # Đây là cách hiệu quả để kiểm tra thay vì chỉ dựa vào ret của cap.read()
-        if self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) == 0:
-            logger.warning(f"CAMERA: Heartbeat check thất bại cho camera index {self.index}. Thiết bị có thể đã bị ngắt kết nối.")
+        
+        # Lệnh grab() đáng tin cậy hơn để kiểm tra kết nối vật lý
+        is_grabbed = self.cap.grab()
+        if not is_grabbed:
             return (False, None)
-        # --- Kết thúc thay đổi ---
-
-        ret, frame = self.cap.read()
-        return (ret, frame)
+        
+        retval, frame = self.cap.retrieve()
+        return (retval, frame)
     
     def release(self):
         if self.isOpened():

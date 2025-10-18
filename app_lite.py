@@ -1,5 +1,4 @@
 # file: app_lite.py
-# PHIÊN BẢN CUỐI CÙNG - SỬA LỖI TREO MÁY BẰNG CÁCH DÙNG QTIMER
 
 import sys
 import logging
@@ -22,7 +21,7 @@ from core.worker import ProcessingWorker
 from utils.license_manager import verify_key
 from utils.resource_path import resource_path
 
-# --- Các hàm cấu hình và license (không đổi) ---
+# --- Các hàm cấu hình và license ---
 APP_DATA_DIR = user_data_dir("ShootingAppLite", "LuanTung")
 os.makedirs(APP_DATA_DIR, exist_ok=True)
 log_file_path = os.path.join(APP_DATA_DIR, "app_log_lite.txt")
@@ -33,29 +32,60 @@ logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(), file_
 logging.info("--- Application Lite Started ---")
 
 def _load_config() -> dict:
-    config_path = "config.json"; defaults = {"camera_index": 0}
+    config_path = os.path.join(APP_DATA_DIR, "config.json")
+    # Chỉ giữ lại camera_index và logo_size trong cấu hình mặc định
+    defaults = {
+        "camera_index": 0,
+        "logo_size": {
+            "width": 150,
+            "height": 150
+        }
+    }
+    
     try:
         if not os.path.exists(config_path):
-            with open(config_path, "w", encoding='utf-8') as f: json.dump(defaults, f, indent=4)
+            with open(config_path, "w", encoding='utf-8') as f:
+                json.dump(defaults, f, indent=4, ensure_ascii=False)
             return defaults
-        with open(config_path, "r", encoding='utf-8') as f: loaded_config = json.load(f)
-        defaults.update(loaded_config); return defaults
+        
+        with open(config_path, "r", encoding='utf-8') as f:
+            loaded_config = json.load(f)
+        
+        # Tự động thêm các key còn thiếu vào file config của người dùng
+        config_updated = False
+        for key, value in defaults.items():
+            if key not in loaded_config:
+                loaded_config[key] = value
+                config_updated = True
+        
+        if config_updated:
+            with open(config_path, "w", encoding='utf-8') as f:
+                json.dump(loaded_config, f, indent=4, ensure_ascii=False)
+            
+        return loaded_config
     except (json.JSONDecodeError, IOError) as e:
-        logging.error(f"Lỗi khi đọc file config.json: {e}. Sử dụng giá trị mặc định."); return defaults
+        logging.error(f"Lỗi khi đọc file config.json: {e}. Sử dụng giá trị mặc định.")
+        return defaults
 
 def check_or_request_license() -> bool:
     license_file_path = os.path.join(APP_DATA_DIR, 'license.key')
     if os.path.exists(license_file_path):
         with open(license_file_path, 'r', encoding='utf-8') as f: key = f.read().strip()
-        if verify_key(key): logging.info("License hợp lệ được tìm thấy."); return True
-        else: logging.warning("File license không hợp lệ, đang xóa."); os.remove(license_file_path)
+        if verify_key(key):
+            logging.info("License hợp lệ được tìm thấy.")
+            return True
+        else:
+            logging.warning("File license không hợp lệ, đang xóa.")
+            os.remove(license_file_path)
     while True:
         key, ok = QInputDialog.getText(None, "Yêu cầu Kích hoạt", "Vui lòng nhập License Key:")
         if not ok: return False
         if verify_key(key):
             with open(license_file_path, 'w', encoding='utf-8') as f: f.write(key)
-            QMessageBox.information(None, "Thành công", "Kích hoạt thành công!"); return True
-        else: QMessageBox.warning(None, "Lỗi", "License Key không hợp lệ.")
+            QMessageBox.information(None, "Thành công", "Kích hoạt thành công!")
+            return True
+        else:
+            QMessageBox.warning(None, "Lỗi", "License Key không hợp lệ.")
 
 
 class PracticeLiteWindow(QMainWindow):
@@ -63,6 +93,7 @@ class PracticeLiteWindow(QMainWindow):
 
     def __init__(self, config: dict, worker: ProcessingWorker, trigger: BluetoothTrigger):
         super().__init__()
+        self.setStyleSheet("background-color: #2c3e50;")
         self.setWindowTitle("Phần Mềm Bắn Pháo Sa Bàn")
         self.setWindowIcon(QIcon(resource_path("assets/app_icon.ico")))
         
@@ -70,7 +101,8 @@ class PracticeLiteWindow(QMainWindow):
         self.audio_manager = AudioManager()
         self.trigger = trigger
         self.worker = worker
-        self.gui = MainGui()
+        # Truyền config vào MainGui để lấy kích thước logo
+        self.gui = MainGui(self.config)
         self.setCentralWidget(self.gui)
 
         self.cam = None
@@ -80,7 +112,6 @@ class PracticeLiteWindow(QMainWindow):
         self.calibrated_center = None
         self.is_processing = False
 
-        # <<< SỬ DỤNG LẠI KIẾN TRÚC QTIMER ỔN ĐỊNH >>>
         self.video_timer = QTimer(self)
         self.video_timer.timeout.connect(self.update_frame)
         
@@ -98,7 +129,7 @@ class PracticeLiteWindow(QMainWindow):
         self.worker.practice_finished.connect(self.on_processing_finished)
     
     def start_camera(self):
-        self.disconnect_camera() # Dừng các tiến trình cũ
+        self.disconnect_camera()
 
         if count_available_cameras() < 2:
             self.disconnect_camera("Vui lòng kết nối USB camera và nhấn 'Làm mới'")
@@ -115,7 +146,7 @@ class PracticeLiteWindow(QMainWindow):
         
         is_ok, _ = self.cam.read()
         if is_ok:
-            self.video_timer.start(30) # ~33 FPS
+            self.video_timer.start(30)
             self.is_camera_connected = True
             self.trigger.activate()
             logging.info(f"Đã kết nối camera index {cam_index} và bắt đầu cập nhật.")
@@ -132,13 +163,12 @@ class PracticeLiteWindow(QMainWindow):
         self.cam = None
         self.is_camera_connected = False
         self.gui.camera_view_label.setText(message)
-        self.gui.camera_view_label.setPixmap(QPixmap()) # Xóa ảnh cũ
+        self.gui.camera_view_label.setPixmap(QPixmap())
 
     def update_frame(self):
         if not self.is_camera_connected or self.cam is None: 
             return
         
-        # <<< ĐIỂM MẤU CHỐT: cam.read() SẼ TRẢ VỀ FALSE KHI MẤT KẾT NỐI >>>
         ret, frame = self.cam.read()
         if not ret or frame is None:
             logging.warning("update_frame phát hiện đọc frame thất bại. Ngắt kết nối...")
@@ -253,7 +283,6 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     if check_or_request_license():
         config = _load_config()
-        # Worker xử lý ảnh vẫn chạy trên luồng riêng để không làm treo giao diện
         processing_thread = QThread()
         processing_worker = ProcessingWorker(config=config)
         processing_worker.moveToThread(processing_thread)
@@ -264,7 +293,7 @@ if __name__ == '__main__':
         app.aboutToQuit.connect(window.shutdown_components)
         app.aboutToQuit.connect(bt_trigger.stop_global_listener)
         app.aboutToQuit.connect(processing_thread.quit)
-        app.aboutToQuit.connect(processing_thread.wait) # Đảm bảo luồng xử lý kết thúc an toàn
+        app.aboutToQuit.connect(processing_thread.wait)
         
         processing_thread.start()
         bt_trigger.start_global_listener()

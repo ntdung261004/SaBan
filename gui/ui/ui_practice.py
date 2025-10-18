@@ -1,5 +1,4 @@
 # file: gui/ui/ui_practice.py
-# NỘI DUNG ĐÃ TRẢ LẠI TRẠNG THÁI GIAO DIỆN GỐC CHO TIÊU ĐỀ
 
 import cv2
 from PySide6.QtWidgets import (
@@ -45,12 +44,13 @@ class VideoLabel(QLabel):
         painter.drawPixmap(point, scaled_pixmap)
 
 class MainGui(QWidget):
-    def __init__(self):
+    def __init__(self, config: dict):
         super().__init__()
+        self.config = config # Lưu config để lấy logo_size
+        
         self.setStyleSheet("""
             QWidget { background-color: #2c3e50; color: #ecf0f1; font-family: 'Segoe UI'; }
             QFrame#panel { background-color: #34495e; border-radius: 12px; border: 1px solid #4a6278; }
-            /* <<< THAY ĐỔI: Trả lại style gốc cho tiêu đề, không có màu nền */
             QLabel#title { color: #ecf0f1; padding: 10px; }
             QLabel.panel-title { font-size: 16px; font-weight: bold; color: #ecf0f1; padding: 8px 15px; background-color: #415a72; border-radius: 6px; }
             QPushButton { background-color: #1abc9c; color: white; font-size: 14px; font-weight: bold; border: none; padding: 10px 20px; border-radius: 8px; }
@@ -67,36 +67,67 @@ class MainGui(QWidget):
         self.setupUi()
 
     def setupUi(self):
-        root_layout = QVBoxLayout(self); root_layout.setContentsMargins(20, 10, 20, 20); root_layout.setSpacing(15)
-        title_label = QLabel("PHẦN MỀM BẮN PHÁO SA BÀN"); title_label.setObjectName("title"); title_label.setAlignment(Qt.AlignCenter)
-        title_label.setFont(QFont('Segoe UI', 18, QFont.Bold)); root_layout.addWidget(title_label)
-        columns_layout = QHBoxLayout(); columns_layout.setSpacing(20)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(20, 10, 20, 20)
+        root_layout.setSpacing(15)
+
+        title_label = QLabel("PHẦN MỀM BẮN PHÁO SA BÀN")
+        title_label.setObjectName("title")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setFont(QFont('Segoe UI', 18, QFont.Bold))
+        root_layout.addWidget(title_label)
+
+        columns_layout = QHBoxLayout()
+        columns_layout.setSpacing(20)
         columns_layout.addWidget(self._create_camera_column(), 6)
         columns_layout.addWidget(self._create_right_column(), 4)
         root_layout.addLayout(columns_layout)
 
     def _create_styled_panel(self) -> QFrame:
-        panel = QFrame(); panel.setObjectName("panel")
-        shadow = QGraphicsDropShadowEffect(panel); shadow.setBlurRadius(20); shadow.setColor(QColor(0, 0, 0, 80)); shadow.setOffset(0, 5)
-        panel.setGraphicsEffect(shadow); return panel
+        panel = QFrame()
+        panel.setObjectName("panel")
+        shadow = QGraphicsDropShadowEffect(panel)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 5)
+        panel.setGraphicsEffect(shadow)
+        return panel
 
     def _create_camera_column(self) -> QWidget:
         panel = self._create_styled_panel()
-        layout = QVBoxLayout(panel); layout.setContentsMargins(15, 15, 15, 15)
-        title = QLabel("Đường ngắm trực tiếp"); title.setProperty("class", "panel-title"); title.setAlignment(Qt.AlignCenter)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        title = QLabel("Đường ngắm trực tiếp")
+        title.setProperty("class", "panel-title")
+        title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
-        self.camera_view_label = VideoLabel("Vui lòng kết nối camera")
+        
+        self.camera_view_label = VideoLabel("Vui lòng kết nối camera và nhấn làm mới.")
         layout.addWidget(self.camera_view_label, 1)
+        
         controls_container = QWidget()
-        controls_layout = QHBoxLayout(controls_container); controls_layout.setContentsMargins(0, 5, 0, 0)
+        controls_layout = QHBoxLayout(controls_container)
+        controls_layout.setContentsMargins(0, 5, 0, 0)
+        
         self.refresh_button = QPushButton("Làm mới")
-        self.zoom_slider = QSlider(Qt.Horizontal); self.zoom_slider.setRange(10, 50); self.zoom_slider.setValue(10)
-        self.zoom_value_label = QLabel("1.0x"); self.zoom_value_label.setObjectName("zoomValueLabel")
+        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider.setRange(10, 50)
+        self.zoom_slider.setValue(10)
+        self.zoom_value_label = QLabel("1.0x")
+        self.zoom_value_label.setObjectName("zoomValueLabel")
+        
         self.calibrate_button = QPushButton("Hiệu chỉnh tâm")
+        
         controls_layout.addWidget(self.refresh_button)
-        controls_layout.addWidget(QLabel("Khoảng cách:")); controls_layout.addWidget(self.zoom_slider, 1); controls_layout.addWidget(self.zoom_value_label)
-        controls_layout.addSpacing(15); controls_layout.addWidget(self.calibrate_button)
-        layout.addWidget(controls_container); return panel
+        controls_layout.addWidget(QLabel("Khoảng cách:"))
+        controls_layout.addWidget(self.zoom_slider, 1)
+        controls_layout.addWidget(self.zoom_value_label)
+        controls_layout.addSpacing(15)
+        controls_layout.addWidget(self.calibrate_button)
+        
+        layout.addWidget(controls_container)
+        return panel
 
     def _create_right_column(self) -> QWidget:
         panel = self._create_styled_panel()
@@ -104,39 +135,36 @@ class MainGui(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        # --- Phần trên: Logo và Tên (Tỷ lệ 4) ---
         top_container = QWidget()
         top_layout = QVBoxLayout(top_container)
         top_layout.setSpacing(15)
         top_layout.setContentsMargins(0, 15, 0, 15)
 
-        # --- Bọc logo trong một QHBoxLayout với "lò xo đẩy" ---
         logo_h_layout = QHBoxLayout()
         logo_label = QLabel()
-        
         pixmap = QPixmap(resource_path("assets/images/logo.png"))
-        
         logo_label.setPixmap(pixmap)
         logo_label.setScaledContents(True)
-        logo_label.setMaximumSize(150, 150)
-        logo_label.setAlignment(Qt.AlignCenter)
+
+        # Đọc kích thước logo từ config
+        logo_size_config = self.config.get("logo_size", {"width": 150, "height": 150})
+        logo_width = logo_size_config.get("width", 150)
+        logo_height = logo_size_config.get("height", 150)
+        logo_label.setMaximumSize(logo_width, logo_height)
         
+        logo_label.setAlignment(Qt.AlignCenter)
         logo_h_layout.addStretch()
         logo_h_layout.addWidget(logo_label)
         logo_h_layout.addStretch()
         
-        # Họ và tên
         name_label = QLabel("Tác giả: Nguyễn Trung Trực")
-        name_font = QFont("Segoe UI", 14, QFont.Bold)
-        name_label.setFont(name_font)
+        name_label.setFont(QFont("Segoe UI", 14, QFont.Bold))
         name_label.setAlignment(Qt.AlignCenter)
 
-        # Thêm layout chứa logo vào layout chính của phần trên
         top_layout.addLayout(logo_h_layout)
         top_layout.addWidget(name_label)
         top_layout.addStretch()
 
-        # --- Phần dưới: Khung kết quả (Tỷ lệ 6) ---
         result_box = QGroupBox("Điểm nổ:")
         result_layout = QVBoxLayout(result_box)
         self.time_label = QLabel("Thời gian: --:--:--")
@@ -144,11 +172,9 @@ class MainGui(QWidget):
         result_layout.addWidget(self.time_label)
         result_layout.addWidget(self.result_image_label, 1)
 
-        # --- Nút đóng ứng dụng ---
         self.close_button = QPushButton("Đóng ứng dụng")
         self.close_button.setObjectName("danger")
         
-        # --- Thêm các phần vào layout chính với tỷ lệ ---
         layout.addWidget(top_container, 4)
         layout.addWidget(result_box, 6)
         layout.addWidget(self.close_button)
@@ -157,12 +183,16 @@ class MainGui(QWidget):
 
     def _convert_cv_to_pixmap(self, cv_img) -> QPixmap:
         if cv_img is None: return QPixmap()
-        rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB); h, w, ch = rgb_image.shape; bytes_per_line = ch * w
-        qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888); return QPixmap.fromImage(qt_image)
+        rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        h, w, ch = rgb_image.shape
+        bytes_per_line = ch * w
+        qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        return QPixmap.fromImage(qt_image)
 
     def display_frame(self, frame_bgr):
         if frame_bgr is None: return
-        pixmap = self._convert_cv_to_pixmap(frame_bgr); self.camera_view_label.setPixmap(pixmap)
+        pixmap = self._convert_cv_to_pixmap(frame_bgr)
+        self.camera_view_label.setPixmap(pixmap)
 
     def update_results(self, time_str, result_frame):
         self.time_label.setText(f"Thời gian: {time_str}")

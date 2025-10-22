@@ -1,73 +1,69 @@
 # file: utils/license_manager.py
 import hashlib
-import psutil  # Sử dụng psutil để quét tất cả các card mạng
-import re
+import logging
+import subprocess
+import sys # <<< THÊM MỚI để kiểm tra hệ điều hành
 
-SECRET_SALT = "0986534710"  # Giữ nguyên chuỗi bí mật của bạn
+logger = logging.getLogger(__name__)
+SECRET_SALT = "0986534710" # Giữ nguyên chuỗi bí mật của bạn
 
-def get_all_mac_addresses():
+# --- BẮT ĐẦU VÙNG SỬA ĐỔI: HỖ TRỢ ĐA NỀN TẢNG (WINDOWS & MACOS) ---
+def get_system_uuid() -> str:
     """
-    Quét và trả về một danh sách tất cả các địa chỉ MAC vật lý có trên máy.
-    Hàm này là cốt lõi cho việc xác thực bền vững.
+    Lấy UUID của bo mạch chủ, hoạt động trên cả Windows và macOS.
+    Đây là định danh ổn định và đáng tin cậy.
     """
-    mac_addresses = set()  # Dùng set để tránh trùng lặp
-    # Biểu thức chính quy để nhận diện một địa chỉ MAC hợp lệ
-    mac_pattern = re.compile(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})')
+    platform = sys.platform
+    command = ""
     
+    if platform == "win32":
+        # Lệnh cho Windows
+        command = "wmic csproduct get uuid"
+    elif platform == "darwin":
+        # Lệnh cho macOS
+        command = "ioreg -d2 -c IOPlatformExpertDevice | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
+    else:
+        logger.error(f"Hệ điều hành không được hỗ trợ: {platform}")
+        return "UUID_UNSUPPORTED_OS"
+
     try:
-        for interface, snics in psutil.net_if_addrs().items():
-            for snic in snics:
-                if snic.family == psutil.AF_LINK and mac_pattern.match(snic.address):
-                    # Chuẩn hóa MAC về dạng chuỗi liền, viết hoa
-                    clean_mac = snic.address.upper().replace(':', '').replace('-', '')
-                    # Bỏ qua các địa chỉ MAC ảo hoặc loopback phổ biến
-                    if not clean_mac.startswith('00000000') and not clean_mac.startswith('0242'):
-                        mac_addresses.add(clean_mac)
-    except Exception:
-        # Trong trường hợp không thể quét, thử dùng getmac như một phương án dự phòng
-        from getmac import get_mac_address
-        try:
-            mac = get_mac_address()
-            if mac:
-                mac_addresses.add(mac.replace(':', '').upper())
-        except Exception:
-            pass # Bỏ qua nếu cả hai đều lỗi
+        # Chạy lệnh tương ứng với hệ điều hành
+        uuid_raw = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+        
+        # Làm sạch kết quả trả về
+        clean_uuid = uuid_raw.strip().split('\n')[-1].strip()
+        
+        if clean_uuid and len(clean_uuid) > 5:
+             logger.info(f"Lấy được System UUID ({platform}): {clean_uuid}")
+             return clean_uuid
+        else:
+            logger.error(f"Lệnh ({command}) không trả về UUID hợp lệ.")
+            return "UUID_NOT_FOUND"
+            
+    except Exception as e:
+        logger.error(f"Lỗi nghiêm trọng khi lấy System UUID trên {platform}: {e}")
+        return "UUID_ERROR"
 
-    return list(mac_addresses)
-
-def generate_key(mac_address: str) -> str:
-    """Tạo license key từ địa chỉ MAC và chuỗi bí mật."""
-    # Luôn xóa các dấu phân cách khỏi MAC address đầu vào
-    clean_mac = mac_address.upper().replace(':', '').replace('-', '')
-    
+def generate_key(system_id: str) -> str:
+    """Tạo license key từ một định danh hệ thống (UUID) và chuỗi bí mật."""
     s = hashlib.sha256()
-    data = f"{clean_mac}-{SECRET_SALT}"
+    data = f"{system_id.strip().upper()}-{SECRET_SALT}"
     s.update(data.encode('utf-8'))
     return s.hexdigest()[:24].upper()
 
 def verify_key(license_key: str) -> bool:
-    """
-    TỐI ƯU: Kiểm tra xem license key có hợp lệ với BẤT KỲ địa chỉ MAC nào
-    của máy tính hiện tại không.
-    """
-    if not license_key:
-        return False
-        
-    # Lấy danh sách tất cả các địa chỉ MAC có trên máy
-    all_macs = get_all_mac_addresses()
+    """Kiểm tra xem license key có hợp lệ với máy tính hiện tại không."""
+    current_uuid = get_system_uuid()
     
-    if not all_macs:
-        # Nếu không tìm thấy MAC nào, không thể xác thực
+    if "UUID_" in current_uuid:
+        logger.error(f"Không thể xác thực key vì không lấy được UUID. Mã lỗi: {current_uuid}")
         return False
-
-    # Duyệt qua từng địa chỉ MAC tìm được
-    for mac in all_macs:
-        # Tạo một key thử nghiệm từ địa chỉ MAC đó
-        test_key = generate_key(mac)
         
-        # Nếu key thử nghiệm khớp với license key đã cho, xác thực thành công
-        if test_key == license_key.upper():
-            return True
-            
-    # Nếu không có địa chỉ MAC nào khớp, xác thực thất bại
-    return False
+    expected_key = generate_key(current_uuid)
+    is_valid = (license_key.strip().upper() == expected_key)
+    
+    if not is_valid:
+        logger.warning(f"Xác thực thất bại. Key cung cấp: {license_key}, Key mong đợi cho UUID ({current_uuid}): {expected_key}")
+        
+    return is_valid
+# --- KẾT THÚC VÙNG SỬA ĐỔI ---

@@ -1,8 +1,8 @@
 ; === Shooting App Installer Script ===
 
 #define MyAppName "Phần Mềm Bắn Pháo Sa Bàn"
-#define MyAppVersion "1.0"
-#define MyAppPublisher "MinhLuan"
+#define MyAppVersion "1.0.1"
+#define MyAppPublisher "LTSoftware"
 #define MyAppExeName "SaBan.exe"
 #define MyAppIconName "assets\app_icon.ico" 
 #define MyOutputFolder "dist\SaBan"

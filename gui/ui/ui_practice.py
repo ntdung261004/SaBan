@@ -3,9 +3,9 @@
 import cv2
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QFrame,
-    QGraphicsDropShadowEffect, QGroupBox, QSizePolicy
+    QGraphicsDropShadowEffect, QGroupBox, QSizePolicy, QComboBox, QStackedWidget, QLayout
 )
-from PySide6.QtGui import QFont, QImage, QPixmap, QPainter, QColor
+from PySide6.QtGui import QFont, QImage, QPixmap, QPainter, QColor, QResizeEvent
 from PySide6.QtCore import Qt, QPoint, Signal
 
 from utils.resource_path import resource_path
@@ -17,7 +17,8 @@ class VideoLabel(QLabel):
         self._pixmap = QPixmap()
         self.setScaledContents(False)
         self.aspect_ratio = 1.0
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Quan trọng: Ignored để widget không tự push kích thước, tuân thủ layout cha
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.setAlignment(Qt.AlignCenter)
         self._is_calibrating = False
 
@@ -46,139 +47,273 @@ class VideoLabel(QLabel):
 class MainGui(QWidget):
     def __init__(self, config: dict):
         super().__init__()
-        self.config = config # Lưu config để lấy logo_size
-        
-        self.setStyleSheet("""
-            QWidget { background-color: #2c3e50; color: #ecf0f1; font-family: 'Segoe UI'; }
-            QFrame#panel { background-color: #34495e; border-radius: 12px; border: 1px solid #4a6278; }
-            QLabel#title { color: #ecf0f1; padding: 10px; }
-            QLabel.panel-title { font-size: 16px; font-weight: bold; color: #ecf0f1; padding: 8px 15px; background-color: #415a72; border-radius: 6px; }
-            QPushButton { background-color: #1abc9c; color: white; font-size: 14px; font-weight: bold; border: none; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background-color: #16a085; }
-            QPushButton#danger { background-color: #e74c3c; }
-            QPushButton#danger:hover { background-color: #c0392b; }
-            QSlider::groove:horizontal { border: 1px solid #4a6278; height: 4px; background: #2c3e50; margin: 2px 0; border-radius: 2px; }
-            QSlider::handle:horizontal { background: #1abc9c; border: 1px solid #1abc9c; width: 18px; margin: -7px 0; border-radius: 9px; }
-            VideoLabel { background-color: #212f3d; border: 1px solid #4a6278; border-radius: 8px; color: #95a5a6; font-size: 24px; }
-            #zoomValueLabel { font-size: 13px; font-weight: bold; color: #1abc9c; min-width: 45px; }
-            QGroupBox { font-size: 14px; font-weight: bold; border: 1px solid #4a6278; border-radius: 8px; margin-top: 10px; }
-            QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top center; padding: 2px 8px; background-color: #415a72; border-radius: 4px; }
-        """)
+        self.config = config
+        self.base_width = 1280.0
+        self.scale_factor = 1.0
         self.setupUi()
+        self.update_responsive_style()
+
+    def resizeEvent(self, event: QResizeEvent):
+        new_width = event.size().width()
+        # Tính lại scale factor
+        self.scale_factor = max(0.6, min(new_width / self.base_width, 1.5))
+        self.update_responsive_style()
+        super().resizeEvent(event)
+
+    def update_responsive_style(self):
+        """Điều chỉnh kích thước CSS nhỏ gọn hơn"""
+        # Giảm base size xuống: 12px cho chữ thường, 16px cho tiêu đề
+        font_normal = max(10, int(12 * self.scale_factor))
+        font_title = max(14, int(16 * self.scale_factor))
+        font_panel_title = max(12, int(14 * self.scale_factor))
+        font_big = max(18, int(24 * self.scale_factor))
+        
+        padding_btn_v = int(6 * self.scale_factor) # Padding dọc nhỏ hơn
+        padding_btn_h = int(12 * self.scale_factor)
+        radius = int(6 * self.scale_factor)
+
+        style_sheet = f"""
+            QWidget {{ background-color: #f5f6fa; color: #2c3e50; font-family: 'Segoe UI'; font-size: {font_normal}px; }}
+            
+            QFrame#panel {{ background-color: #ffffff; border-radius: {radius + 2}px; border: 1px solid #dcdde1; }}
+            
+            QLabel#title {{ color: #2c3e50; padding: 5px; font-size: {font_title}px; font-weight: bold; }}
+            
+            QLabel.panel-title {{ 
+                font-size: {font_panel_title}px; font-weight: bold; color: #2c3e50; 
+                padding: {int(5 * self.scale_factor)}px {int(10 * self.scale_factor)}px; 
+                background-color: #e5e9f2; border-radius: {radius}px; 
+            }}
+            
+            QPushButton {{ 
+                background-color: #1abc9c; color: white; font-size: {font_normal}px; font-weight: bold; 
+                border: none; padding: {padding_btn_v}px {padding_btn_h}px; border-radius: {radius}px; 
+            }}
+            QPushButton:hover {{ background-color: #16a085; }}
+            
+            QPushButton#danger {{ background-color: #e74c3c; }}
+            QPushButton#danger:hover {{ background-color: #c0392b; }}
+            
+            QPushButton#warning {{ background-color: #f39c12; }} 
+            QPushButton#warning:hover {{ background-color: #d35400; }}
+            
+            QSlider::groove:horizontal {{ border: 1px solid #bdc3c7; height: 4px; background: #ecf0f1; margin: 2px 0; border-radius: 2px; }}
+            QSlider::handle:horizontal {{ background: #1abc9c; border: 1px solid #1abc9c; width: 16px; margin: -6px 0; border-radius: 8px; }}
+            
+            VideoLabel {{ background-color: #dfe6e9; border: 1px solid #bdc3c7; border-radius: {radius}px; color: #7f8c8d; }}
+            
+            QGroupBox {{ 
+                font-size: {font_normal}px; font-weight: bold; 
+                border: 1px solid #bdc3c7; border-radius: {radius}px; 
+                margin-top: {int(18 * self.scale_factor)}px; 
+            }}
+            QGroupBox::title {{ 
+                subcontrol-origin: margin; subcontrol-position: top left; 
+                left: 10px; padding: 0 5px; 
+                color: #2c3e50;
+            }}
+            
+            QComboBox {{
+                background-color: #ffffff; border: 1px solid #bdc3c7; border-radius: {radius}px;
+                padding: 3px 10px; font-weight: bold; min-width: {int(120 * self.scale_factor)}px;
+            }}
+            
+            .big-number {{ font-size: {font_big}px; font-weight: bold; color: #2c3e50; }}
+        """
+        self.setStyleSheet(style_sheet)
 
     def setupUi(self):
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(20, 10, 20, 20)
-        root_layout.setSpacing(15)
+        # Giảm margin tổng thể
+        root_layout.setContentsMargins(10, 5, 10, 10)
+        root_layout.setSpacing(10)
 
-        title_label = QLabel("PHẦN MỀM BẮN PHÁO SA BÀN")
+        # --- Header ---
+        header_layout = QHBoxLayout()
+        header_layout.addStretch(1)
+        title_label = QLabel("PHẦN MỀM LUYỆN TẬP NGẮM BIA CHỈ ĐỎ")
         title_label.setObjectName("title")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        root_layout.addWidget(title_label)
+        header_layout.addWidget(title_label, 2)
 
-        columns_layout = QHBoxLayout()
-        columns_layout.setSpacing(20)
-        columns_layout.addWidget(self._create_camera_column(), 6)
-        columns_layout.addWidget(self._create_right_column(), 4)
-        root_layout.addLayout(columns_layout)
+        mode_container = QHBoxLayout()
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Kiểm tra điểm ngắm", "Kiểm tra độ chụm"])
+        self.mode_combo.setCursor(Qt.PointingHandCursor)
+        mode_container.addWidget(QLabel("Chế độ:"))
+        mode_container.addWidget(self.mode_combo)
+        header_layout.addLayout(mode_container, 1) 
+        root_layout.addLayout(header_layout)
+
+        # --- Content Stack ---
+        self.stacked_widget = QStackedWidget()
+        self.page_practice = self._create_practice_page()
+        self.stacked_widget.addWidget(self.page_practice)
+        self.page_grouping = self._create_grouping_page()
+        self.stacked_widget.addWidget(self.page_grouping)
+        
+        root_layout.addWidget(self.stacked_widget)
 
     def _create_styled_panel(self) -> QFrame:
         panel = QFrame()
         panel.setObjectName("panel")
         shadow = QGraphicsDropShadowEffect(panel)
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 5)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 50))
+        shadow.setOffset(0, 3)
         panel.setGraphicsEffect(shadow)
         return panel
 
-    def _create_camera_column(self) -> QWidget:
+    def _create_practice_page(self) -> QWidget:
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(15)
+        layout.addWidget(self._create_camera_column(is_grouping=False), 6)
+        layout.addWidget(self._create_right_column_practice(), 4)
+        return page
+
+    def _create_grouping_page(self) -> QWidget:
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(15)
+        layout.addWidget(self._create_camera_column(is_grouping=True), 6)
+        layout.addWidget(self._create_right_column_grouping(), 4)
+        return page
+
+    # Gộp hàm tạo cột Camera vì giống nhau 99%
+    def _create_camera_column(self, is_grouping: bool) -> QWidget:
         panel = self._create_styled_panel()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
         
-        title = QLabel("Đường ngắm trực tiếp")
+        title_text = "Camera Kiểm Tra" if is_grouping else "Đường ngắm trực tiếp"
+        title = QLabel(title_text)
         title.setProperty("class", "panel-title")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
-        self.camera_view_label = VideoLabel("Vui lòng kết nối camera và nhấn làm mới.")
-        layout.addWidget(self.camera_view_label, 1)
+        video_label = VideoLabel("Đang tải...")
+        layout.addWidget(video_label, 1)
         
+        # Controls
         controls_container = QWidget()
         controls_layout = QHBoxLayout(controls_container)
-        controls_layout.setContentsMargins(0, 5, 0, 0)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.refresh_button = QPushButton("Làm mới")
-        self.zoom_slider = QSlider(Qt.Horizontal)
-        self.zoom_slider.setRange(10, 50)
-        self.zoom_slider.setValue(10)
-        self.zoom_value_label = QLabel("1.0x")
-        self.zoom_value_label.setObjectName("zoomValueLabel")
+        refresh_btn = QPushButton("Làm mới")
+        zoom_slider = QSlider(Qt.Horizontal)
+        zoom_slider.setRange(10, 50)
+        zoom_slider.setValue(10)
+        zoom_val_lbl = QLabel("1.0x")
+        zoom_val_lbl.setObjectName("zoomValueLabel")
+        calibrate_btn = QPushButton("Hiệu chỉnh tâm")
         
-        self.calibrate_button = QPushButton("Hiệu chỉnh tâm")
-        
-        controls_layout.addWidget(self.refresh_button)
-        controls_layout.addWidget(QLabel("Khoảng cách:"))
-        controls_layout.addWidget(self.zoom_slider, 1)
-        controls_layout.addWidget(self.zoom_value_label)
-        controls_layout.addSpacing(15)
-        controls_layout.addWidget(self.calibrate_button)
-        
+        controls_layout.addWidget(refresh_btn)
+        controls_layout.addWidget(QLabel("Zoom:"))
+        controls_layout.addWidget(zoom_slider, 1)
+        controls_layout.addWidget(zoom_val_lbl)
+        controls_layout.addSpacing(10)
+        controls_layout.addWidget(calibrate_btn)
         layout.addWidget(controls_container)
+
+        # Gán biến vào class để controller gọi được
+        if not is_grouping:
+            self.camera_view_label = video_label
+            self.refresh_button = refresh_btn
+            self.zoom_slider = zoom_slider
+            self.zoom_value_label = zoom_val_lbl
+            self.calibrate_button = calibrate_btn
+        else:
+            self.grouping_camera_view = video_label
+            self.grouping_refresh_btn = refresh_btn
+            self.grouping_zoom_slider = zoom_slider
+            self.grouping_zoom_val_lbl = zoom_val_lbl
+            self.grouping_calibrate_btn = calibrate_btn
+
         return panel
 
-    def _create_right_column(self) -> QWidget:
+    # --- CỘT PHẢI PAGE 1: PRACTICE ---
+    def _create_right_column_practice(self) -> QWidget:
         panel = self._create_styled_panel()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(20)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
 
-        top_container = QWidget()
-        top_layout = QVBoxLayout(top_container)
-        top_layout.setSpacing(15)
-        top_layout.setContentsMargins(0, 15, 0, 15)
-
-        logo_h_layout = QHBoxLayout()
-        logo_label = QLabel()
-        pixmap = QPixmap(resource_path("assets/images/logo.png"))
-        logo_label.setPixmap(pixmap)
-        logo_label.setScaledContents(True)
-
-        # Đọc kích thước logo từ config
-        logo_size_config = self.config.get("logo_size", {"width": 150, "height": 150})
-        logo_width = logo_size_config.get("width", 150)
-        logo_height = logo_size_config.get("height", 150)
-        logo_label.setMaximumSize(logo_width, logo_height)
+        # 1. Phần Trên (Tỷ lệ 3) - ĐỂ TRỐNG theo yêu cầu
+        top_box = QGroupBox("Thông tin")
+        # Quan trọng: Expanding để chiếm đúng tỷ lệ 3 phần
+        top_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-        logo_label.setAlignment(Qt.AlignCenter)
-        logo_h_layout.addStretch()
-        logo_h_layout.addWidget(logo_label)
-        logo_h_layout.addStretch()
+        # 2. Phần Dưới (Tỷ lệ 7) - KẾT QUẢ
+        result_box = QGroupBox("Kết quả điểm ngắm")
+        result_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-        name_label = QLabel("Tác giả: Nguyễn Trung Trực")
-        name_label.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        name_label.setAlignment(Qt.AlignCenter)
-
-        top_layout.addLayout(logo_h_layout)
-        top_layout.addWidget(name_label)
-        top_layout.addStretch()
-
-        result_box = QGroupBox("Điểm nổ:")
-        result_layout = QVBoxLayout(result_box)
+        r_layout = QVBoxLayout(result_box)
+        r_layout.setContentsMargins(10, 15, 10, 10)
         self.time_label = QLabel("Thời gian: --:--:--")
-        self.result_image_label = VideoLabel("Chưa có ảnh kết quả")
-        result_layout.addWidget(self.time_label)
-        result_layout.addWidget(self.result_image_label, 1)
+        self.result_image_label = VideoLabel("Chưa có ảnh")
+        r_layout.addWidget(self.time_label)
+        r_layout.addWidget(self.result_image_label, 1)
 
         self.close_button = QPushButton("Đóng ứng dụng")
         self.close_button.setObjectName("danger")
-        
-        layout.addWidget(top_container, 4)
-        layout.addWidget(result_box, 6)
+
+        # SET TỶ LỆ CỨNG 3/7
+        layout.addWidget(top_box, 3)
+        layout.addWidget(result_box, 7)
         layout.addWidget(self.close_button)
+        return panel
+
+    # --- CỘT PHẢI PAGE 2: GROUPING ---
+    def _create_right_column_grouping(self) -> QWidget:
+        panel = self._create_styled_panel()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(15)
+
+        # 1. Phần Trên (Tỷ lệ 3) - THÔNG TIN & RESET
+        info_box = QGroupBox("Thông tin bài bắn")
+        info_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
+        i_layout = QVBoxLayout(info_box)
+        i_layout.setContentsMargins(10, 15, 10, 10)
+        i_layout.addStretch()
+        
+        self.grouping_shot_count_lbl = QLabel("Số phát bắn: 0")
+        self.grouping_shot_count_lbl.setProperty("class", "big-number")
+        self.grouping_shot_count_lbl.setAlignment(Qt.AlignCenter)
+        
+        self.grouping_reset_btn = QPushButton("Bắn lại (Reset)")
+        self.grouping_reset_btn.setObjectName("warning")
+        self.grouping_reset_btn.setCursor(Qt.PointingHandCursor)
+
+        i_layout.addWidget(self.grouping_shot_count_lbl)
+        i_layout.addWidget(self.grouping_reset_btn)
+        i_layout.addStretch()
+
+        # 2. Phần Dưới (Tỷ lệ 7) - KẾT QUẢ
+        result_box = QGroupBox("Kết quả điểm ngắm")
+        result_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        r_layout = QVBoxLayout(result_box)
+        r_layout.setContentsMargins(10, 15, 10, 10)
+        
+        self.grouping_result_lbl = QLabel("Chưa có dữ liệu")
+        self.grouping_result_view = VideoLabel("Chưa có ảnh")
+        
+        r_layout.addWidget(self.grouping_result_lbl)
+        r_layout.addWidget(self.grouping_result_view, 1)
+
+        self.grouping_close_btn = QPushButton("Đóng ứng dụng")
+        self.grouping_close_btn.setObjectName("danger")
+
+        # SET TỶ LỆ CỨNG 3/7
+        layout.addWidget(info_box, 3)
+        layout.addWidget(result_box, 7)
+        layout.addWidget(self.grouping_close_btn)
         return panel
 
     def _convert_cv_to_pixmap(self, cv_img) -> QPixmap:
@@ -192,7 +327,11 @@ class MainGui(QWidget):
     def display_frame(self, frame_bgr):
         if frame_bgr is None: return
         pixmap = self._convert_cv_to_pixmap(frame_bgr)
-        self.camera_view_label.setPixmap(pixmap)
+        current_idx = self.stacked_widget.currentIndex()
+        if current_idx == 0:
+            self.camera_view_label.setPixmap(pixmap)
+        elif current_idx == 1:
+            self.grouping_camera_view.setPixmap(pixmap)
 
     def update_results(self, time_str, result_frame):
         self.time_label.setText(f"Thời gian: {time_str}")
